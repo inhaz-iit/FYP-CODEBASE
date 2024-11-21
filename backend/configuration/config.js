@@ -10,6 +10,7 @@ const requiredVariables = [
     'ACCESS_TOKEN_SECRET',
     'REFRESH_TOKEN_SECRET',
     'ADMIN_WALLET_PK',
+    'PORT'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -25,7 +26,8 @@ const config = {
     MONGO_STRING: process.env.MONGO_STRING,
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET,
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
-    ADMIN_WALLET_PK: process.env.ADMIN_WALLET_PK
+    ADMIN_WALLET_PK: process.env.ADMIN_WALLET_PK,
+    PORT: process.env.PORT
 }
 
 // generate mongoURI for database

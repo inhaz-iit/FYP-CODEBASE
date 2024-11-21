@@ -25,15 +25,12 @@ const MCController = require("./controllers/MCController");
 require("./controllers/PRCDriverController");
 // Initiating Express
 const app = express();
-const port = "5004";
 
 app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      "http://localhost:4200", 
-      "https://dev.greensync.com.lk", // Dev Environment 
-      "https://greensync.com.lk", //  Prod Environment
+      "http://localhost:4200" 
     ],
   })
 );
@@ -61,8 +58,8 @@ app.use(requireAuth);
 mongoose
   .connect(config.MONGO_URI)
   .then(() => {
-    app.listen(port, () => {
-      console.log(`Server running on port ${port}`);
+    app.listen(config.PORT, () => {
+      console.log(`Server running on port ${config.PORT}`);
     });
   })
   .catch((error) => {
