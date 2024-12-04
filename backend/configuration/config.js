@@ -4,13 +4,10 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Define required environment variables
 const requiredVariables = [
+    'PORT',
     'MONGO_USERNAME', 
     'MONGO_PASSWORD',
-    'MONGO_STRING',
-    'ACCESS_TOKEN_SECRET',
-    'REFRESH_TOKEN_SECRET',
-    'ADMIN_WALLET_PK',
-    'PORT'
+    'MONGO_STRING'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -21,13 +18,10 @@ if (missingVariables.length > 0) {
 
 // Stores all the environment variable in the config object
 const config = {
+    PORT: process.env.PORT,
     MONGO_USERNAME: process.env.MONGO_USERNAME,
     MONGO_PASSWORD: process.env.MONGO_PASSWORD,
-    MONGO_STRING: process.env.MONGO_STRING,
-    ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET,
-    REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
-    ADMIN_WALLET_PK: process.env.ADMIN_WALLET_PK,
-    PORT: process.env.PORT
+    MONGO_STRING: process.env.MONGO_STRING
 }
 
 // generate mongoURI for database
