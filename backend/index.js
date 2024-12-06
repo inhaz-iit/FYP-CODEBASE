@@ -2,16 +2,16 @@
 const express = require("express");
 const mongoose = require("mongoose");
 
-// // Getting the configuration values
+// Getting the configuration values
 const config = require("./configuration/config");
 
-// // Importing the routes
+// Importing the routes
 
 
-// // Importing Controllers and creating instance
+// Importing Controllers and creating instance
 
 
-// // Initiating Express
+// Initiating Express
 const app = express();
 
 // Verifying the connection to database and starting the server
