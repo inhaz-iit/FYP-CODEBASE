@@ -2,17 +2,22 @@
 const express = require("express");
 const mongoose = require("mongoose");
 
+// Initiating Express
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Getting the configuration values
 const config = require("./configuration/config");
 
 // Importing the routes
-
+const walletRoute = require("./routes/wallet");
 
 // Importing Controllers and creating instance
 
 
-// Initiating Express
-const app = express();
+// Main route and the sub routes
+app.use("/wallet", walletRoute);
 
 // Verifying the connection to database and starting the server
 mongoose
@@ -31,13 +36,8 @@ mongoose
 
 
 
-
-
-
-
-
-  // // Importing libraries
-  // const mongoose = require("mongoose");
+// // Importing libraries
+// const mongoose = require("mongoose");
 // const express = require("express");
 // const cors = require("cors");
 // const cookieParser = require("cookie-parser");
