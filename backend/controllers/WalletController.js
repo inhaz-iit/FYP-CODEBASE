@@ -21,6 +21,16 @@ class WalletController{
             res.status(400).json({error:error.message})
         }
     }
+
+    static async sendTokens (req,res) {
+        try{
+            const newWallet = await walletService.sendTokens(req, res);
+            return res.status(200).json({newWallet});
+        }
+        catch(error){
+            res.status(400).json({error:error.message})
+        }
+    }
 }
 
 
