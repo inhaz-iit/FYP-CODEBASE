@@ -7,8 +7,12 @@ module.exports = {
   solidity: "0.8.20",
   networks: {
     sepolia: {
-        url: config.SEPOLIA_RPC, // Your Sepolia RPC URL
-        accounts: [config.PRIVATE_KEY]  // Your wallet private key
+        url: config.SEPOLIA_RPC, // Sepolia RPC URL
+        accounts: [config.PRIVATE_KEY]  // wallet private key
+    },
+    amoy: {
+        url: config.AMOY_RPC, // Amoy RPC URL
+        accounts: [config.PRIVATE_KEY]  // wallet private key
     },
   },
   gasReporter: {
