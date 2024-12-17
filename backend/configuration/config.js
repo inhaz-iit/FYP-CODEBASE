@@ -10,7 +10,10 @@ const requiredVariables = [
     'MONGO_STRING',
     'SEPOLIA_RPC',
     'PRIVATE_KEY',
-    'AMOY_RPC'
+    'AMOY_RPC',
+    'TOKEN_ADDRESS',
+    'WRAPPED_TOKEN_ADDRESS',
+    'LOCK_CONTRACT_ADDRESS'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -27,7 +30,10 @@ const config = {
     MONGO_STRING: process.env.MONGO_STRING,
     SEPOLIA_RPC: process.env.SEPOLIA_RPC,
     PRIVATE_KEY: process.env.PRIVATE_KEY,
-    AMOY_RPC: process.env.AMOY_RPC
+    AMOY_RPC: process.env.AMOY_RPC,
+    TOKEN_ADDRESS: process.env.TOKEN_ADDRESS,
+    WRAPPED_TOKEN_ADDRESS: process.env.WRAPPED_TOKEN_ADDRESS,
+    LOCK_CONTRACT_ADDRESS: process.env.LOCK_CONTRACT_ADDRESS
 }
 
 // generate mongoURI for database
