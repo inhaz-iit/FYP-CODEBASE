@@ -1,20 +1,21 @@
-require("dotenv").config();
 const { ethers } = require("hardhat");
+const config = require("../../configuration/config");
 
 async function main() {
-    console.log("Deploying MintContract...");
+    const tokenAddress = config.WRAPPED_TOKEN_ADDRESS;
+    const [deployer] = await ethers.getSigners();
 
-    // Get the contract factory
+    console.log("Deploying MintContract with account:", deployer.address);
+
     const MintContract = await ethers.getContractFactory("MintContract");
+    const mintContract = await MintContract.deploy(tokenAddress);
 
-    // Deploy the contract
-    const mintContract = await MintContract.deploy();
-
-    console.log("MintContract deployed to:", mintContract.address);
-    console.log("Transaction Hash:", mintContract.deployTransaction.hash);
+    await mintContract.waitForDeployment();
+    
+    console.log("mintContract deployed to:", mintContract);
+    console.log("MintContract deployed to:", await mintContract.getAddress());
 }
 
-// Execute the script
 main()
     .then(() => process.exit(0))
     .catch((error) => {

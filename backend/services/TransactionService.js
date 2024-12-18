@@ -6,6 +6,7 @@ const { ethers } = require("ethers");
 class TransactionService {
     async sendTokens(walletParams,res) {
         const lockContractResponse = await this.lockTokensInContract(walletParams);
+        const mintContractResponse = await this.mintTokensInContract(walletParams);
         console.log(lockContractResponse);
     }
 
@@ -50,6 +51,10 @@ class TransactionService {
             console.error("Error while locking tokens:", error);
             throw new Error("Error while locking tokens");
         }
+    }
+
+    async mintTokensInContract(walletParams) {
+        
     }
 }
   
