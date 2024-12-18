@@ -20,4 +20,9 @@ module.exports = {
     currency: "ETH",
     gasPrice: 20,
   },
+  etherscan: {
+    apiKey: {
+      sepolia: config.ETHERSCAN_API_KEY,
+    }
+  }
 };

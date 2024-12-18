@@ -12,12 +12,14 @@ const config = require("./configuration/config");
 
 // Importing the routes
 const walletRoute = require("./routes/wallet");
+const transactionRoute = require("./routes/transactionRoute");
 
 // Importing Controllers and creating instance
 
 
 // Main route and the sub routes
 app.use("/wallet", walletRoute);
+app.use("/transaction", transactionRoute);
 
 // Verifying the connection to database and starting the server
 mongoose

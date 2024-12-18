@@ -13,7 +13,9 @@ const requiredVariables = [
     'AMOY_RPC',
     'TOKEN_ADDRESS',
     'WRAPPED_TOKEN_ADDRESS',
-    'LOCK_CONTRACT_ADDRESS'
+    'LOCK_CONTRACT_ADDRESS',
+    'SENDER_PRIVATE_KEY',
+    'ETHERSCAN_API_KEY'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -33,7 +35,9 @@ const config = {
     AMOY_RPC: process.env.AMOY_RPC,
     TOKEN_ADDRESS: process.env.TOKEN_ADDRESS,
     WRAPPED_TOKEN_ADDRESS: process.env.WRAPPED_TOKEN_ADDRESS,
-    LOCK_CONTRACT_ADDRESS: process.env.LOCK_CONTRACT_ADDRESS
+    LOCK_CONTRACT_ADDRESS: process.env.LOCK_CONTRACT_ADDRESS,
+    SENDER_PRIVATE_KEY: process.env.SENDER_PRIVATE_KEY,
+    ETHERSCAN_API_KEY: process.env.ETHERSCAN_API_KEY
 }
 
 // generate mongoURI for database
