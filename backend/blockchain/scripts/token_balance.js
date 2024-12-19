@@ -1,11 +1,12 @@
 const hre = require("hardhat");
+const config = require("../../configuration/config");
 
 async function main() {
-    const contractAddress = "0x55D1E12F25E4a974E8a437d1BDD29b3535BCB0E5"; // Replace with your contract address
+    const contractAddress = config.WRAPPED_TOKEN_ADDRESS; // Replace with your contract address
     const walletAddress = "0xbaCa1a7b55227FD1f25A1892df748E22282ca792"; // Replace with your wallet address
 
     // Attach to the deployed contract
-    const Token = await hre.ethers.getContractAt("ZKPridgeCoin", contractAddress);
+    const Token = await hre.ethers.getContractAt("WrappedZKPridgeCoin", contractAddress);
 
     // Check the balance of your wallet
     const balance = await Token.balanceOf(walletAddress);

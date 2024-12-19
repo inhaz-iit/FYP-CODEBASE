@@ -1,13 +1,15 @@
 const config = require("../configuration/config");
 const lockContractABI = require("../blockchain/ABI/LockTokenABI")
 const tokenContractABI = require("../blockchain/ABI/ZKPridgeCoinABI")
+const mintContractABI = require("../blockchain/ABI/MintTokenABI")
 const { ethers } = require("ethers");
 
 class TransactionService {
     async sendTokens(walletParams,res) {
-        const lockContractResponse = await this.lockTokensInContract(walletParams);
+        // const lockContractResponse = await this.lockTokensInContract(walletParams);
         const mintContractResponse = await this.mintTokensInContract(walletParams);
-        console.log(lockContractResponse);
+        // console.log(lockContractResponse);
+        console.log(mintContractResponse);
     }
 
     async lockTokensInContract(walletParams) {
@@ -54,7 +56,39 @@ class TransactionService {
     }
 
     async mintTokensInContract(walletParams) {
-        
+        const { amount, destinationAddress } = walletParams;
+
+        // Mint contract and token configurations
+        const mintContractAddress = config.MINT_CONTRACT_ADDRESS;
+        const destinationRpcUrl = config.AMOY_RPC;
+
+        // Initialize provider and signer for destination chain
+        const provider = new ethers.JsonRpcProvider(destinationRpcUrl);
+        const signer = new ethers.Wallet(config.PRIVATE_KEY, provider);
+
+        const mintContract = new ethers.Contract(
+            mintContractAddress,
+            mintContractABI,
+            signer
+        );
+
+        try {
+            console.log(`Minting ${amount} tokens to address: ${destinationAddress}`);
+
+            // Convert amount to Wei
+            const mintTx = await mintContract.mintTokens(
+                destinationAddress,
+                ethers.parseUnits(amount.toString(), 18)
+            );
+
+            const receipt = await mintTx.wait();
+            console.log("Tokens minted successfully. TX Hash:", receipt.hash);
+
+            return receipt.hash;
+        } catch (error) {
+            console.error("Error while minting tokens:", error);
+            throw new Error("Error while minting tokens");
+        }
     }
 }
   
