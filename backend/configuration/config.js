@@ -7,7 +7,16 @@ const requiredVariables = [
     'PORT',
     'MONGO_USERNAME', 
     'MONGO_PASSWORD',
-    'MONGO_STRING'
+    'MONGO_STRING',
+    'SEPOLIA_RPC',
+    'PRIVATE_KEY',
+    'AMOY_RPC',
+    'TOKEN_ADDRESS',
+    'WRAPPED_TOKEN_ADDRESS',
+    'LOCK_CONTRACT_ADDRESS',
+    'SENDER_PRIVATE_KEY',
+    'ETHERSCAN_API_KEY',
+    'MINT_CONTRACT_ADDRESS'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -21,7 +30,16 @@ const config = {
     PORT: process.env.PORT,
     MONGO_USERNAME: process.env.MONGO_USERNAME,
     MONGO_PASSWORD: process.env.MONGO_PASSWORD,
-    MONGO_STRING: process.env.MONGO_STRING
+    MONGO_STRING: process.env.MONGO_STRING,
+    SEPOLIA_RPC: process.env.SEPOLIA_RPC,
+    PRIVATE_KEY: process.env.PRIVATE_KEY,
+    AMOY_RPC: process.env.AMOY_RPC,
+    TOKEN_ADDRESS: process.env.TOKEN_ADDRESS,
+    WRAPPED_TOKEN_ADDRESS: process.env.WRAPPED_TOKEN_ADDRESS,
+    LOCK_CONTRACT_ADDRESS: process.env.LOCK_CONTRACT_ADDRESS,
+    SENDER_PRIVATE_KEY: process.env.SENDER_PRIVATE_KEY,
+    ETHERSCAN_API_KEY: process.env.ETHERSCAN_API_KEY,
+    MINT_CONTRACT_ADDRESS: process.env.MINT_CONTRACT_ADDRESS
 }
 
 // generate mongoURI for database
