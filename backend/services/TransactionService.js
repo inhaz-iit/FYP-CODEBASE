@@ -6,10 +6,13 @@ const { ethers } = require("ethers");
 
 class TransactionService {
     async sendTokens(walletParams,res) {
-        // const lockContractResponse = await this.lockTokensInContract(walletParams);
+        const lockContractResponse = await this.lockTokensInContract(walletParams);
         const mintContractResponse = await this.mintTokensInContract(walletParams);
-        // console.log(lockContractResponse);
-        console.log(mintContractResponse);
+        return {
+            "Message":"Tokens locked and minted successfully",
+            "Lock Contract Response": lockContractResponse,
+            "Mint Contract Response": mintContractResponse
+        };
     }
 
     async lockTokensInContract(walletParams) {
@@ -34,7 +37,6 @@ class TransactionService {
                 ethers.parseUnits(amount.toString(), 18) // Convert amount to wei
             );
     
-            console.log("Test");
             await approveTx.wait();
             console.log("Tokens approved successfully!");
     

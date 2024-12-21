@@ -113,7 +113,7 @@ module.exports = MintTokenABI = [
     "name": "token",
     "outputs": [
       {
-        "internalType": "contract IERC20",
+        "internalType": "contract WrappedZKPridgeCoin",
         "name": "",
         "type": "address"
       }
