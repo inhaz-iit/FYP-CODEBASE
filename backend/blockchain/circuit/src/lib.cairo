@@ -1,14 +1,12 @@
 use core::array::ArrayTrait;
 use core::option::OptionTrait;
 use core::traits::TryInto;
-use core::hash::{HashStateTrait, Hash};
 use core::pedersen::pedersen;
 use core::traits::Into;
 
 #[starknet::contract]
 mod SignatureVerificationSTARK {
-    use super::{ArrayTrait, Hash, pedersen, OptionTrait, TryInto, Into};
-    use core::hash::HashStateTrait;
+    use super::{ArrayTrait, pedersen, OptionTrait, TryInto, Into};
 
     const FIELD_PRIME: felt252 = 0x400000000000008100000000000000000000000000000000000000000000001;
     const HALF_PRIME: felt252 = 0x200000000000004080000000000000000000000000000000000000000000000;
@@ -157,7 +155,7 @@ mod SignatureVerificationSTARK {
     fn compute_low_degree_extension(trace: @TraceTable) -> Array<felt252> {
         let mut extended = ArrayTrait::new();
         let length_felt = felt252_from_u32(*trace.length);
-        let domain_size = felt252_mul(length_felt, BLOW_UP_FACTOR);
+        let _domain_size = felt252_mul(length_felt, BLOW_UP_FACTOR);
         
         let mut current: felt252 = 1;
         let mut count = 0_u32;

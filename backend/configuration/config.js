@@ -16,7 +16,9 @@ const requiredVariables = [
     'LOCK_CONTRACT_ADDRESS',
     'SENDER_PRIVATE_KEY',
     'ETHERSCAN_API_KEY',
-    'MINT_CONTRACT_ADDRESS'
+    'MINT_CONTRACT_ADDRESS',
+    'ARGENT_X_PRIVATE_KEY',
+    'PUBLIC_KEY'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -39,7 +41,9 @@ const config = {
     LOCK_CONTRACT_ADDRESS: process.env.LOCK_CONTRACT_ADDRESS,
     SENDER_PRIVATE_KEY: process.env.SENDER_PRIVATE_KEY,
     ETHERSCAN_API_KEY: process.env.ETHERSCAN_API_KEY,
-    MINT_CONTRACT_ADDRESS: process.env.MINT_CONTRACT_ADDRESS
+    MINT_CONTRACT_ADDRESS: process.env.MINT_CONTRACT_ADDRESS,
+    ARGENT_X_PRIVATE_KEY: process.env.ARGENT_X_PRIVATE_KEY,
+    PUBLIC_KEY: process.env.PUBLIC_KEY
 }
 
 // generate mongoURI for database
