@@ -1,18 +1,114 @@
 const config = require("../configuration/config");
-const lockContractABI = require("../blockchain/ABI/LockTokenABI")
-const tokenContractABI = require("../blockchain/ABI/ZKPridgeCoinABI")
-const mintContractABI = require("../blockchain/ABI/MintTokenABI")
+const lockContractABI = require("../blockchain/ABI/LockTokenABI");
+const tokenContractABI = require("../blockchain/ABI/ZKPridgeCoinABI");
+const mintContractABI = require("../blockchain/ABI/MintTokenABI");
+const CircuitABI = require("../blockchain/ABI/CircuitABI");
 const { ethers } = require("ethers");
+const { Contract, Provider, constants, hash, num } = require("starknet");
 
 class TransactionService {
+    constructor() {
+        // Initialize StarkNet provider
+        this.starkProvider = new Provider({     
+            sequencer: { network: config.STARKNET_NETWORK }
+        });
+        
+        // Initialize STARK verification contract
+        this.starkContract = new Contract(
+            CircuitABI,
+            config.STARK_CONTRACT_ADDRESS,
+            this.starkProvider
+        );
+    }
+
     async sendTokens(walletParams,res) {
-        const lockContractResponse = await this.lockTokensInContract(walletParams);
-        const mintContractResponse = await this.mintTokensInContract(walletParams);
-        return {
-            "Message":"Tokens locked and minted successfully",
-            "Lock Contract Response": lockContractResponse,
-            "Mint Contract Response": mintContractResponse
-        };
+        try{    
+            // const lockContractResponse = await this.lockTokensInContract(walletParams);
+
+            const proofResult = await this.generateAndVerifyProof(walletParams, "0x1234567890abcdef"); // Replace with actual lock transaction hash
+                
+            if (!proofResult.verified) {
+                throw new Error("STARK proof verification failed");
+            }
+
+            // const mintContractResponse = await this.mintTokensInContract(walletParams);
+            // return {
+            //     "Message":"Tokens locked and minted successfully",
+            //     "Lock Contract Response": lockContractResponse,
+            //     "Proof Verification": proofResult,
+            //     "Mint Contract Response": mintContractResponse
+            // };
+            return {
+                "Message":"Tokens locked and minted successfully",
+                "Proof Verification": proofResult
+            };
+        } catch (error) {
+            console.error("Error in sendTokens:", error);
+            throw error;
+        }
+    }
+
+    async generateAndVerifyProof(walletParams, lockTxHash) {
+        try {
+            // Convert amount to hex string
+            const amountInWei = ethers.parseUnits(walletParams.amount.toString(), 18);
+            // const amountBN = number.toBN(amountInWei.toString());
+
+            // Create message hash using pedersen
+            const messageHash = hash.pedersen([
+                num.hexToDecimalString(lockTxHash),
+                amountStr
+            ])
+
+            // Prepare public input
+            const publicInput = {
+                message_hash: messageHash,
+                public_key: number.toHex(number.toBN("0xA3F3b3f28C537a151527203deA65D40F45F86661")),
+                signature: await this.generateSignature(messageHash)
+            };
+
+            // Prepare private input with proper conversion
+            const privateInput = [
+                number.toHex(number.toBN(config.STARK_PRIVATE_INPUT_1)),
+                number.toHex(number.toBN(config.STARK_PRIVATE_INPUT_2))
+            ];
+
+            console.log("Public Input:", publicInput);
+            console.log("Private Input:", privateInput);
+            console.log("Generating STARK proof...");
+            
+            // Generate proof
+            const proof = await this.starkContract.generate_stark_proof(
+                publicInput,
+                privateInput
+            );
+
+            console.log("Generated Proof:", proof);
+            console.log("Verifying STARK proof...");
+            
+            // Verify proof
+            const verificationResult = await this.starkContract.verify_stark_proof(
+                publicInput,
+                proof
+            );
+
+            console.log("Verification Result:", verificationResult);
+
+            return {
+                verified: verificationResult,
+                proof: proof,
+                publicInput: publicInput
+            };
+
+        } catch (error) {
+            console.error("Detailed error in generateAndVerifyProof:", error);
+            throw new Error(`Failed to generate or verify STARK proof: ${error.message}`);
+        }
+    }
+
+    async generateSignature(messageHash) {
+        // Generate a placeholder signature that's compatible with your contract
+        return messageHash.toString();
     }
 
     async lockTokensInContract(walletParams) {

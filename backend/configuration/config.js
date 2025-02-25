@@ -18,7 +18,11 @@ const requiredVariables = [
     'ETHERSCAN_API_KEY',
     'MINT_CONTRACT_ADDRESS',
     'ARGENT_X_PRIVATE_KEY',
-    'PUBLIC_KEY'
+    'PUBLIC_KEY',
+    'STARKNET_NETWORK',
+    'STARK_CONTRACT_ADDRESS',
+    'STARK_PRIVATE_INPUT_1',
+    'STARK_PRIVATE_INPUT_2'
 ];
 
 // Check if all required environment variables are defined and throws an error if there are missing values in the env file
@@ -43,7 +47,9 @@ const config = {
     ETHERSCAN_API_KEY: process.env.ETHERSCAN_API_KEY,
     MINT_CONTRACT_ADDRESS: process.env.MINT_CONTRACT_ADDRESS,
     ARGENT_X_PRIVATE_KEY: process.env.ARGENT_X_PRIVATE_KEY,
-    PUBLIC_KEY: process.env.PUBLIC_KEY
+    PUBLIC_KEY: process.env.PUBLIC_KEY,
+    STARKNET_NETWORK: process.env.STARKNET_NETWORK,
+    STARK_CONTRACT_ADDRESS: process.env.STARK_CONTRACT_ADDRESS
 }
 
 // generate mongoURI for database
