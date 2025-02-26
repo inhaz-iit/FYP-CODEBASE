@@ -493,28 +493,10 @@
 
         // helper function for felt252 comparison
         fn felt252_gt(a: felt252, b: felt252) -> bool {
-            let difference = a - b;
-
-            println!("Comparing a: {}, b: {}, difference: {}", a, b, difference);
-
-            if difference == 0 {
-                return false;
-            }
-
-            let is_upper = is_upper_half(difference);
-            println!("Is difference upper half? {}", is_upper);
-
-            !is_upper
-        }
-
-
-        fn is_upper_half(value: felt252) -> bool {
-            let shifted = value - HALF_PRIME;
-            println!("Shifted value: {}, Original value: {}", shifted, value);
-            println!("HALF_PRIME: {}", HALF_PRIME);
-
-            // Ensure the boolean expression is the last statement
-            shifted != 0 && (value - shifted != HALF_PRIME)
+            let a_u32: u32 = a.try_into().unwrap_or(0);
+            let b_u32: u32 = b.try_into().unwrap_or(0);
+            
+            a_u32 > b_u32
         }
 
         // Helper function to verify consistency between proof and FRI layers
