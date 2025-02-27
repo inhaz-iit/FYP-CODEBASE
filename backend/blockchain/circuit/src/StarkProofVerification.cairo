@@ -112,7 +112,7 @@
                 @proof.low_degree_proof,
                 @proof.fri_commitments
             );
-
+            println!("verify_stark_proof working: {} , {} , {}", valid_fri, valid_constraints, valid_degree);
             valid_fri && valid_constraints && valid_degree
         }
 
@@ -334,13 +334,17 @@
             let mut i = 0;
             
             loop {
+                println!("Verifying FRI layer {}", i);
                 if i >= proof.layers.len() - 1 {
+                    println!("Reached the end of FRI layers");
                     break;
                 }
                 let current_layer = proof.layers.at(i);
                 let next_layer = proof.layers.at(i + 1);
                 valid = verify_fri_fold(current_layer, next_layer);
+                println!("FRI layer verification: {}", valid);
                 if !valid {
+                    println!("FRI layer verification failed");
                     break;
                 }
                 i += 1;
@@ -419,7 +423,9 @@
             let mut valid = true;
 
             loop {
+                println!("Verifying FRI layer transition {}", i);
                 if i >= fri_proof.layers.len() {
+                    println!("Reached the end of FRI layers");
                     break;
                 }
                 // Get the next FRI layer commitment
@@ -450,8 +456,9 @@
             let final_fri_commitment = commit_to_polynomial(@final_polynomial);
 
             if final_layer_commitment.len() == 0 || 
-            final_fri_commitment.len() == 0 || 
-            *final_layer_commitment.at(0) != *final_fri_commitment.at(0) {
+                final_fri_commitment.len() == 0 || 
+                *final_layer_commitment.at(0) != *final_fri_commitment.at(0) 
+            {
                 println!("Final polynomial commitment mismatch");
                 return false;
             }
@@ -466,7 +473,7 @@
                 println!("Final polynomial degree is too high");
                 return false;
             }
-
+            println!("verify_low_degree_proof working1654984949499496");
             true
         }
 
@@ -499,26 +506,45 @@
             a_u32 > b_u32
         }
 
-        // Helper function to verify consistency between proof and FRI layers
         fn verify_proof_consistency(
             proof: @Array<felt252>,
             fri_proof: @FRICommitment
         ) -> bool {
-            // Verify initial commitment matches first FRI layer
-            let initial_commitment = commit_to_polynomial(proof);
-            if initial_commitment.len() == 0 || fri_proof.layers.len() == 0 {
-                false
+            // First fold the polynomial like in generate_fri_proof
+            let folded = fri_fold_polynomial(proof);
+            
+            // Generate hash consistent with how it's done in generate_fri_proof
+            let mut initial_hash: felt252 = 0;
+            if folded.len() > 0 {
+                initial_hash = pedersen(0, *folded.at(0));
+                println!("Computed correct initial hash: {}", initial_hash);
             } else {
-                let first_fri_layer = fri_proof.layers.at(0);
-                if first_fri_layer.len() == 0 {
-                    false
-                } else {
-                    let commitment_value = initial_commitment.at(0);
-                    let fri_layer_value = first_fri_layer.at(0);
-                    *commitment_value == *fri_layer_value
-                }
+                println!("Folded polynomial is empty");
+                return false;
             }
+            
+            // Check if FRI layers exist
+            if fri_proof.layers.len() == 0 {
+                println!("FRI layers are empty");
+                return false;
+            }
+            
+            // Get the first FRI layer
+            let first_fri_layer = fri_proof.layers.at(0);
+            if first_fri_layer.len() == 0 {
+                println!("First FRI layer is empty");
+                return false;
+            }
+
+            // Verify the commitment matches
+            println!("Initial hash: {}, First FRI layer commitment: {}", initial_hash, *first_fri_layer.at(0));
+            let matches = initial_hash == *first_fri_layer.at(0);
+            if !matches {
+                println!("Hash mismatch in verification");
+            }
+            matches
         }
+
 
         fn main() {
             // Step 1: Define public and private inputs
