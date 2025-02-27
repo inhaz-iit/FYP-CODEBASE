@@ -332,7 +332,7 @@
         fn verify_fri_proof(proof: @FRICommitment) -> bool {
             let mut valid = true;
             let mut i = 0;
-            
+
             loop {
                 println!("Verifying FRI layer {}", i);
                 if i >= proof.layers.len() - 1 {
@@ -354,8 +354,19 @@
         }
 
         fn verify_fri_fold(current: @Array<felt252>, next: @Array<felt252>) -> bool {
-            *current.at(0) == *next.at(0)
+            if current.len() == 0 || next.len() == 0 {
+                return false;
+            }
+            
+            // For the first layer, we need to check that the commitment matches
+            // In practice, you'd need a more comprehensive check here
+            let current_commitment = *current.at(0);
+            let next_commitment = *next.at(0);
+            
+            println!("Current commitment: {}, Next commitment: {}", current_commitment, next_commitment);
+            current_commitment == next_commitment
         }
+
 
         fn verify_constraint_evaluations(
             evaluations: @Array<felt252>,
