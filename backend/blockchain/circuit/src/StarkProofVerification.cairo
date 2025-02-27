@@ -29,7 +29,8 @@
 
         #[derive(Drop, Serde)]
         struct FRICommitment {
-            layers: Array<Array<felt252>>,
+            layers: Array<Array<felt252>>,     // Commitments
+            polynomials: Array<Array<felt252>>, // Actual polynomials for each layer
             final_polynomial: Array<felt252>
         }
 
@@ -201,7 +202,15 @@
             }
 
             let mut layers = ArrayTrait::new();
+            let mut polynomials = ArrayTrait::new();
             let mut current_layer = polynomial.clone();
+
+            polynomials.append(current_layer.clone());
+
+            // First, add the original polynomial commitment
+            let original_commitment = commit_to_polynomial(@current_layer);
+            layers.append(original_commitment);
+            
             let mut i: u32 = 0;
 
             loop {
@@ -217,10 +226,12 @@
                     panic!("fri_fold_polynomial returned an empty array");
                 }
 
-                // Create a new layer with the commitment
-                let mut layer = ArrayTrait::new();
-                layer.append(pedersen(0, *folded.at(0)));
-                layers.append(layer);
+                // Store the folded polynomial
+                polynomials.append(folded.clone());
+
+                // Commit to the folded polynomial
+                let folded_commitment = commit_to_polynomial(@folded);
+                layers.append(folded_commitment);
 
                 // Update current layer for the next iteration
                 current_layer = folded;
@@ -234,10 +245,11 @@
                 i += 1;
             };
 
-            println!("generate_fri_proof working");
+            println!("generate_fri_proof working with {} layers", layers.len());
 
             FRICommitment {
                 layers: layers,
+                polynomials: polynomials,
                 final_polynomial: current_layer
             }
         }
@@ -330,27 +342,93 @@
         }
 
         fn verify_fri_proof(proof: @FRICommitment) -> bool {
-            let mut valid = true;
+            // Check if we have enough layers to verify
+            if proof.layers.len() < 2 || proof.polynomials.len() < 2 {
+                println!("Not enough FRI layers to verify");
+                return false;
+            }
+            
             let mut i = 0;
-
+            let mut valid = true;
+            
             loop {
                 println!("Verifying FRI layer {}", i);
                 if i >= proof.layers.len() - 1 {
                     println!("Reached the end of FRI layers");
                     break;
                 }
-                let current_layer = proof.layers.at(i);
-                let next_layer = proof.layers.at(i + 1);
-                valid = verify_fri_fold(current_layer, next_layer);
-                println!("FRI layer verification: {}", valid);
-                if !valid {
-                    println!("FRI layer verification failed");
+                
+                // Get the next layer commitment
+                let next_layer_commitment = proof.layers.at(i + 1);
+                
+                // Get the polynomial for the current layer
+                let current_poly = proof.polynomials.at(i).clone();
+                
+                // Fold the polynomial
+                let folded_poly = fri_fold_polynomial(@current_poly);
+                
+                // Commit to the folded polynomial
+                let expected_commitment = commit_to_polynomial(@folded_poly);
+                
+                // Compare the commitment of the folded polynomial with the next layer's commitment
+                if !compare_commitments(@expected_commitment, next_layer_commitment) {
+                    println!("FRI layer verification failed at layer {}", i);
+                    valid = false;
                     break;
                 }
+                
                 i += 1;
             };
-            println!("verify_fri_proof working");
+            
+            println!("FRI proof verification result: {}", valid);
             valid
+        }
+
+        fn compare_commitments(commitment1: @Array<felt252>, commitment2: @Array<felt252>) -> bool {
+            if commitment1.len() != commitment2.len() {
+                return false;
+            }
+            
+            let mut i = 0;
+            let mut are_equal = true;
+            
+            loop {
+                if i >= commitment1.len() {
+                    break;
+                }
+                
+                if *commitment1.at(i) != *commitment2.at(i) {
+                    are_equal = false;
+                    break;
+                }
+                
+                i += 1;
+            };
+            
+            are_equal
+        }
+
+        fn get_polynomial_for_layer(proof: @FRICommitment, layer_index: usize) -> Array<felt252> {
+            // Validate the layer index
+            if layer_index >= proof.polynomials.len() {
+                println!("Layer index {} out of bounds (max: {})", 
+                        layer_index, proof.polynomials.len() - 1);
+                
+                // Return an empty array as fallback
+                return ArrayTrait::new();
+            }
+            
+            // Return the stored polynomial for this layer
+            proof.polynomials.at(layer_index).clone()
+        }
+
+
+        fn get_original_polynomial(proof: @FRICommitment) -> Array<felt252> {
+            // This is a placeholder - in a real implementation, you would need to have
+            // the original polynomial or a way to derive it
+            let mut original = ArrayTrait::new();
+            // Add elements to the original polynomial
+            original
         }
 
         fn verify_fri_fold(current: @Array<felt252>, next: @Array<felt252>) -> bool {
@@ -428,31 +506,66 @@
                 return false;
             }
 
-            // Verify FRI layer transitions
-            let mut current_layer = proof.clone();
+            // Use the polynomials directly from the FRI proof for verification
             let mut i: u32 = 0;
             let mut valid = true;
 
             loop {
-                println!("Verifying FRI layer transition {}", i);
-                if i >= fri_proof.layers.len() {
-                    println!("Reached the end of FRI layers");
+                if i >= fri_proof.polynomials.len() - 1 {
+                    println!("Reached the end of FRI polynomials");
                     break;
                 }
-                // Get the next FRI layer commitment
-                let next_layer_commitment = fri_proof.layers.at(i);
-                // Compute the folded polynomial
-                let folded = fri_fold_polynomial(@current_layer);
-                // Verify the commitment matches
-                let computed_commitment = commit_to_polynomial(@folded);
-
-                if computed_commitment.len() == 0 || 
-                *computed_commitment.at(0) != *next_layer_commitment.at(0) {
-                    println!("FRI layer commitment mismatch at layer {}", i);
+                
+                println!("Verifying FRI layer transition {}", i);
+                
+                // Get the current polynomial and fold it
+                let current_poly = fri_proof.polynomials.at(i).clone();
+                let folded = fri_fold_polynomial(@current_poly);
+                
+                // Compare with the next polynomial in the FRI proof
+                let next_poly = fri_proof.polynomials.at(i + 1).clone();
+                
+                if folded.len() != next_poly.len() {
+                    println!("Folded polynomial length mismatch: {} vs {}", 
+                            folded.len(), next_poly.len());
                     valid = false;
                     break;
                 }
-                current_layer = folded;
+                
+                // Check each element
+                let mut j = 0;
+                let mut polynomials_match = true;
+                
+                loop {
+                    if j >= folded.len() {
+                        break;
+                    }
+                    
+                    if *folded.at(j) != *next_poly.at(j) {
+                        println!("Polynomial mismatch at index {} in layer {}: {} vs {}", 
+                                j, i, *folded.at(j), *next_poly.at(j));
+                        polynomials_match = false;
+                        break;
+                    }
+                    
+                    j += 1;
+                };
+                
+                if !polynomials_match {
+                    valid = false;
+                    break;
+                }
+                
+                // Also verify commitments match
+                let computed_commitment = commit_to_polynomial(@folded);
+                let stored_commitment = fri_proof.layers.at(i + 1);
+                
+                if !compare_commitments(@computed_commitment, stored_commitment) {
+                    println!("Commitment mismatch at layer {}", i);
+                    valid = false;
+                    break;
+                }
+                
                 i += 1;
             };
 
@@ -462,20 +575,44 @@
             }
 
             // Verify final polynomial matches
-            let final_layer_commitment = commit_to_polynomial(@current_layer);
-            let final_polynomial = fri_proof.final_polynomial.clone();
-            let final_fri_commitment = commit_to_polynomial(@final_polynomial);
-
-            if final_layer_commitment.len() == 0 || 
-                final_fri_commitment.len() == 0 || 
-                *final_layer_commitment.at(0) != *final_fri_commitment.at(0) 
-            {
-                println!("Final polynomial commitment mismatch");
+            let final_layer = fri_proof.polynomials.len() - 1;
+            let final_poly = fri_proof.polynomials.at(final_layer).clone();
+            
+            if final_poly.len() == 0 {
+                println!("Final polynomial is empty");
+                return false;
+            }
+            
+            // Verify it matches the stored final polynomial
+            if final_poly.len() != fri_proof.final_polynomial.len() {
+                println!("Final polynomial length mismatch");
+                return false;
+            }
+            
+            let mut k = 0;
+            let mut final_poly_matches = true;
+            
+            loop {
+                if k >= final_poly.len() {
+                    break;
+                }
+                
+                if *final_poly.at(k) != *fri_proof.final_polynomial.at(k) {
+                    final_poly_matches = false;
+                    break;
+                }
+                
+                k += 1;
+            };
+            
+            if !final_poly_matches {
+                println!("Final polynomial mismatch");
                 return false;
             }
 
             // Verify degree of final polynomial
-            let final_degree = calculate_max_degree(@final_polynomial);
+            let final_polys = fri_proof.final_polynomial.clone();
+            let final_degree = calculate_max_degree(@final_polys);
             let bound = felt252_from_u32(BLOW_UP_FACTOR_U32);
 
             println!("Final polynomial degree: {}, Bound: {}", final_degree, bound);
@@ -484,7 +621,8 @@
                 println!("Final polynomial degree is too high");
                 return false;
             }
-            println!("verify_low_degree_proof working1654984949499496");
+            
+            println!("verify_low_degree_proof working");
             true
         }
 
@@ -521,41 +659,57 @@
             proof: @Array<felt252>,
             fri_proof: @FRICommitment
         ) -> bool {
-            // First fold the polynomial like in generate_fri_proof
-            let folded = fri_fold_polynomial(proof);
-            
-            // Generate hash consistent with how it's done in generate_fri_proof
-            let mut initial_hash: felt252 = 0;
-            if folded.len() > 0 {
-                initial_hash = pedersen(0, *folded.at(0));
-                println!("Computed correct initial hash: {}", initial_hash);
-            } else {
-                println!("Folded polynomial is empty");
-                return false;
-            }
-            
-            // Check if FRI layers exist
-            if fri_proof.layers.len() == 0 {
-                println!("FRI layers are empty");
-                return false;
-            }
-            
-            // Get the first FRI layer
-            let first_fri_layer = fri_proof.layers.at(0);
-            if first_fri_layer.len() == 0 {
-                println!("First FRI layer is empty");
+            // Check if polynomials exists in the FRI proof
+            if fri_proof.polynomials.len() == 0 || fri_proof.layers.len() == 0 {
+                println!("FRI proof has no polynomials or layers");
                 return false;
             }
 
-            // Verify the commitment matches
-            println!("Initial hash: {}, First FRI layer commitment: {}", initial_hash, *first_fri_layer.at(0));
-            let matches = initial_hash == *first_fri_layer.at(0);
-            if !matches {
-                println!("Hash mismatch in verification");
+            // Get the first polynomial from FRI proof
+            let first_poly = fri_proof.polynomials.at(0);
+            
+            // Compare the proof polynomial with the first polynomial in FRI
+            if proof.len() != first_poly.len() {
+                println!("Proof length mismatch: {} vs {}", proof.len(), first_poly.len());
+                return false;
             }
-            matches
+            
+            // Compare each element
+            let mut i = 0;
+            let mut are_equal = true;
+            
+            loop {
+                if i >= proof.len() {
+                    break;
+                }
+                
+                if *proof.at(i) != *first_poly.at(i) {
+                    println!("Element mismatch at index {}: {} vs {}", 
+                            i, *proof.at(i), *first_poly.at(i));
+                    are_equal = false;
+                    break;
+                }
+                
+                i += 1;
+            };
+            
+            if !are_equal {
+                println!("Proof polynomial doesn't match FRI's first polynomial");
+                return false;
+            }
+            
+            // Ensure the commitment matches too
+            let proof_commitment = commit_to_polynomial(proof);
+            let first_layer_commitment = fri_proof.layers.at(0);
+            
+            if !compare_commitments(@proof_commitment, first_layer_commitment) {
+                println!("Proof commitment doesn't match FRI's first layer commitment");
+                return false;
+            }
+            
+            println!("Proof and FRI layers are consistent");
+            true
         }
-
 
         fn main() {
             // Step 1: Define public and private inputs
