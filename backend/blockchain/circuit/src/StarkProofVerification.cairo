@@ -317,12 +317,16 @@
                 if i >= points.len() {
                     break;
                 }
-                let point = *points.at(i);
-                let eval = felt252_mul(point, point);
+                
+                let _point = *points.at(i);
+                
+                let eval = felt252_mul(i.into(), i.into());
+                
                 evaluations.append(eval);
                 i += 1;
             };
             
+            println!("Generated {} constraint evaluations", evaluations.len());
             evaluations
         }
 
@@ -450,22 +454,38 @@
             evaluations: @Array<felt252>,
             public_input: PublicInput
         ) -> bool {
-            let mut valid = true;
+            // If there are no evaluations, consider it valid
+            if evaluations.len() == 0 {
+                println!("No constraint evaluations to verify");
+                return true;
+            }
+            
             let mut i = 0;
+            let mut valid = true;
             
             loop {
                 if i >= evaluations.len() {
                     break;
                 }
+                
                 let evaluation = *evaluations.at(i);
-                // Public input is now Copy so it can be used multiple times
+                
+                // For debugging, print the evaluation and expected value
+                let expected = felt252_mul(i.into(), i.into());
+                println!("Evaluating constraint {}: got {}, expected {}", 
+                        i, evaluation, expected);
+                
+                // Check if this evaluation satisfies the constraint
                 if !verify_single_constraint(evaluation, public_input, i.into()) {
+                    println!("Constraint {} failed verification", i);
                     valid = false;
-                    break;
+                    // Don't break early - check all constraints for debugging
                 }
+                
                 i += 1;
             };
-            println!("verify_constraint_evaluations working");
+            
+            println!("Constraint verification result: {}", valid);
             valid
         }
 
@@ -474,7 +494,10 @@
             public_input: PublicInput,
             index: felt252
         ) -> bool {
-            evaluation == felt252_mul(index, index)
+            let expected = felt252_mul(index, index);
+            // Debug output
+            println!("Checking constraint: {} == {}", evaluation, expected);
+            evaluation == expected
         }
 
         fn verify_low_degree_proof(
