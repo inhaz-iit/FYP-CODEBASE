@@ -56,24 +56,6 @@
             signature: felt252,
         }
 
-        // Helper functions for felt252 arithmetic
-        fn felt252_mul(a: felt252, b: felt252) -> felt252 {
-            if a == 0 || b == 0 {
-                return 0;
-            }
-            let result = a * b;
-            if result == 0 {
-                panic!("Multiplication overflow");
-            }
-            result
-        }
-
-        fn felt252_add(a: felt252, b: felt252) -> felt252 {
-            let result = a + b;
-            // For felt252, simple addition is safe as it's performed modulo the field prime
-            result
-        }
-
         fn generate_stark_proof(
             public_input: PublicInput,
             private_input: Array<felt252>
@@ -91,7 +73,7 @@
                 @random_points
             );
 
-            println!("generate_execution_trace working");
+            println!("Proof is generated");
             STARKProof {
                 trace_commitment: trace_commitment,
                 trace_evaluation: evaluations,
@@ -670,12 +652,28 @@
             max_degree
         }
 
-        // helper function for felt252 comparison
         fn felt252_gt(a: felt252, b: felt252) -> bool {
             let a_u32: u32 = a.try_into().unwrap_or(0);
             let b_u32: u32 = b.try_into().unwrap_or(0);
             
             a_u32 > b_u32
+        }
+
+        fn felt252_mul(a: felt252, b: felt252) -> felt252 {
+            if a == 0 || b == 0 {
+                return 0;
+            }
+            let result = a * b;
+            if result == 0 {
+                panic!("Multiplication overflow");
+            }
+            result
+        }
+
+        fn felt252_add(a: felt252, b: felt252) -> felt252 {
+            let result = a + b;
+            // For felt252, simple addition is safe as it's performed modulo the field prime
+            result
         }
 
         fn verify_proof_consistency(
