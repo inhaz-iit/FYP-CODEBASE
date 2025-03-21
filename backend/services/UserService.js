@@ -57,6 +57,45 @@ class UserService {
 
         return schema.validate(userData);
     }   
+
+    async userLogin(userData) {
+        try {
+            // Validate user input
+            const { error } = this.validateLoginInput(userData);
+            if (error) {
+                throw new Error(error.details[0].message);
+            }
+
+            // Check if the user exists
+            const user = await UserModel.findOne({ email: userData.email });
+            if (!user) {
+                throw new Error("User not found");
+            }
+
+            // Check if the password is correct
+            const validPassword = await bcrypt.compare(userData.password, user.password);
+            if (!validPassword) {
+                throw new Error("Invalid password");
+            }
+
+            return {
+                loginStatus: true,
+                Message: "User logged in successfully"
+            };
+        } catch (error) {
+            console.error("Error in user login:", error);
+            throw error;
+        }
+    }
+
+    validateLoginInput(userData) {
+        const schema = Joi.object({
+            email: Joi.string().email().required(),
+            password: Joi.string().min(6).required(),
+        });
+
+        return schema.validate(userData);
+    }
 }
   
 module.exports = UserService;
