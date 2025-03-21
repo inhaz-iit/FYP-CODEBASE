@@ -11,6 +11,7 @@ app.use(express.urlencoded({ extended: true }));
 const config = require("./configuration/config");
 
 // Importing the routes
+const userRoute = require("./routes/user.js");
 const walletRoute = require("./routes/wallet");
 const transactionRoute = require("./routes/transactionRoute");
 
@@ -18,6 +19,7 @@ const transactionRoute = require("./routes/transactionRoute");
 
 
 // Main route and the sub routes
+app.use("/user", userRoute);
 app.use("/wallet", walletRoute);
 app.use("/transaction", transactionRoute);
 
