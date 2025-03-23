@@ -1,11 +1,15 @@
 // Importing libraries
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
 
 // Initiating Express
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({ origin: ["http://localhost:4200"] })
+);
 
 // Getting the configuration values
 const config = require("./configuration/config");
