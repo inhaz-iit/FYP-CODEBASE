@@ -21,7 +21,8 @@ export class UserRegistrationComponent implements OnInit {
       name: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
       phoneNumber: ['', [Validators.required]],
-      password: ['', [Validators.required, Validators.minLength(8)]]
+      password: ['', [Validators.required, Validators.minLength(8)]],
+      confirmPassword: ['', Validators.required]
     });
   }
 
@@ -65,6 +66,10 @@ export class UserRegistrationComponent implements OnInit {
 
   get formControls() {
     return this.signupForm.controls;
+  }
+
+  get passwordMismatch(): boolean {
+    return this.signupForm.get('password')?.value !== this.signupForm.get('confirmPassword')?.value;
   }
 
   ngOnInit(): void {
