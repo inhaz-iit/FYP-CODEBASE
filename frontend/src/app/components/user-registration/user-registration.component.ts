@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { UserService } from 'src/app/services/user.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-user-registration',
@@ -15,7 +16,8 @@ export class UserRegistrationComponent implements OnInit {
 
   constructor(
     private userService: UserService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private router: Router
   ) {
     this.signupForm = this.fb.group({
       name: ['', [Validators.required]],
@@ -40,7 +42,7 @@ export class UserRegistrationComponent implements OnInit {
     this.errorMessage = '';
     this.successMessage = '';
 
-    const userData = this.signupForm.value;
+    const { confirmPassword, ...userData } = this.signupForm.value;
 
     // Use the service layer to handle the registration
     this.userService.registerUser(userData).subscribe({
@@ -49,6 +51,11 @@ export class UserRegistrationComponent implements OnInit {
         this.successMessage = 'Account created successfully!';
         console.log(response);
         this.signupForm.reset();
+
+        // Navigate to dashboard or home page after successful login
+        setTimeout(() => {
+          this.router.navigate(['/zkpridge']);
+        }, 1000);
       },
       error: (error) => {
         this.isSubmitting = false;

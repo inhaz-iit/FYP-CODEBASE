@@ -7,12 +7,20 @@ import { UserRegistrationComponent } from './components/user-registration/user-r
 import { UserRegistrationPageComponent } from './pages/user-registration-page/user-registration-page.component';
 import { ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
+import { LoginPageComponent } from './pages/login-page/login-page.component';
+import { LoginComponent } from './components/login/login.component';
+import { BridgePageComponent } from './pages/bridge-page/bridge-page.component';
+import { BridgeInterfaceComponent } from './components/bridge-interface/bridge-interface.component';
 
 @NgModule({
   declarations: [
     AppComponent,
+    UserRegistrationPageComponent,
+    LoginPageComponent,
+    BridgePageComponent,
     UserRegistrationComponent,
-    UserRegistrationPageComponent
+    LoginComponent,
+    BridgeInterfaceComponent
   ],
   imports: [
     BrowserModule,
