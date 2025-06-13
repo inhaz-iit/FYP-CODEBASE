@@ -19,7 +19,9 @@
     "@angular/platform-browser-dynamic": "~13.3.0",
     "@angular/router": "~13.3.0",
     "@fortawesome/fontawesome-free": "^6.7.2",
+    "@metamask/detect-provider": "^2.0.0",
     "@tailwindcss/postcss": "^4.0.14",
+    "ethers": "^6.13.5",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.11.4"
