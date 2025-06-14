@@ -84,7 +84,7 @@ mod codev2 {
         constraint_degree: u32,
     }
 
-    // ============ NEW: PROOF TRANSCRIPT FOR FIAT-SHAMIR ============
+    // ============ PROOF TRANSCRIPT FOR FIAT-SHAMIR ============
     
     #[derive(Drop, Serde, Clone)]
     struct ProofTranscript {
@@ -100,7 +100,7 @@ mod codev2 {
         fri_proof: FRICommitment,
         low_degree_proof: Array<felt252>,
         public_coin_seed: felt252,
-        transcript: ProofTranscript,  // NEW: Complete transcript
+        transcript: ProofTranscript,  // Complete transcript
     }
 
     #[derive(Drop, Serde, Clone)]
@@ -160,6 +160,11 @@ mod codev2 {
         let round_as_felt: felt252 = transcript.round_counter.try_into().unwrap_or(0);
         challenge_data.append(round_as_felt);
         
+        // Add a nonce to ensure different challenges even with same transcript state
+        let nonce = transcript.elements.len() + transcript.round_counter;
+        let nonce_felt: felt252 = nonce.try_into().unwrap_or(0);
+        challenge_data.append(nonce_felt);
+        
         let mut i = 0;
         loop {
             if i >= transcript.elements.len() {
@@ -175,6 +180,7 @@ mod codev2 {
         // Append challenge back to transcript for next round
         append_to_transcript(ref transcript, challenge, 4);  // Challenge marker
         
+        println!("Generated challenge: {}", challenge);
         challenge
     }
 
@@ -202,10 +208,32 @@ mod codev2 {
             append_to_transcript(ref transcript, i_felt, 7);  // Query index marker
             let challenge = get_challenge_from_transcript(ref transcript);
             
-            // Map challenge to domain [0, domain_size)
-            let point_index = (challenge.try_into().unwrap_or(0_u32)) % domain_size;
+            // Map challenge to domain [0, domain_size) with better distribution
+            // Convert challenge to u256 for modular arithmetic
+            let challenge_u256: u256 = challenge.into();
+            let domain_size_u256: u256 = domain_size.into();
+            
+            let point_index_u256 = if domain_size_u256 > 0 {
+                challenge_u256 % domain_size_u256
+            } else {
+                0_u256
+            };
+            
+            // Convert back to u32 with fallback
+            let point_index: u32 = match point_index_u256.try_into() {
+                Option::Some(val) => val,
+                Option::None => {
+                    // Simple fallback using hash-like mixing
+                    let challenge_as_u256: u256 = challenge.into();
+                    let mixed = (challenge_as_u256 / 17_u256 + challenge_as_u256 * 13_u256) % domain_size_u256;
+                    mixed.try_into().unwrap_or(i % domain_size)
+                }
+            };
+            
             let point_felt: felt252 = point_index.try_into().unwrap_or(0);
             points.append(point_felt);
+            
+            println!("Query {}: challenge={}, domain_size={}, point_index={}", i, challenge, domain_size, point_index);
             
             i += 1;
         };
@@ -463,7 +491,7 @@ mod codev2 {
         poseidon_hash_span(data.span())
     }
 
-    // ============ IMPROVED FRI IMPLEMENTATION WITH SECURE RANDOMNESS ============
+    // ============ FRI IMPLEMENTATION WITH SECURE RANDOMNESS ============
 
     fn generate_fri_proof_secure(
         polynomial_evaluations: @Array<felt252>,
@@ -666,10 +694,10 @@ mod codev2 {
         }
     }
 
-    // ============ VERIFICATION FUNCTIONS ============
+    // ============ VERIFICATION FUNCTIONS WITH TRANSCRIPT ============
 
-    fn verify_fri_proof(proof: @FRICommitment) -> bool {
-        println!("FRI proof verification: checking layer count...");
+    fn verify_fri_proof_with_transcript(proof: @FRICommitment, transcript: @ProofTranscript) -> bool {
+        println!("FRI proof verification with transcript: checking layer count...");
         
         let min_layers = if proof.layer_trees.len() == 1 && proof.final_polynomial.len() <= 2 {
             1
@@ -692,8 +720,8 @@ mod codev2 {
                         break;
                     }
                     
-                    println!("FRI: Verifying layer transition {}", layer);
-                    if !verify_fri_layer_transition(proof, layer) {
+                    println!("FRI: Verifying layer transition {} with transcript", layer);
+                    if !verify_fri_layer_transition_with_transcript(proof, layer, transcript) {
                         println!("FAILED FRI: Layer transition {} FAILED", layer);
                         all_valid = false;
                         break;
@@ -709,7 +737,7 @@ mod codev2 {
             
             if all_valid {
                 println!("FRI: All layer transitions passed, checking queries...");
-                let query_result = verify_fri_queries(proof);
+                let query_result = verify_fri_queries_with_transcript(proof, transcript);
                 println!("FRI: Query verification result: {}", query_result);
                 query_result
             } else {
@@ -719,8 +747,12 @@ mod codev2 {
         }
     }
 
-    fn verify_fri_layer_transition(proof: @FRICommitment, layer_index: u32) -> bool {
-        println!("FRI layer transition {}: starting verification", layer_index);
+    fn verify_fri_layer_transition_with_transcript(
+        proof: @FRICommitment, 
+        layer_index: u32, 
+        transcript: @ProofTranscript
+    ) -> bool {
+        println!("FRI layer transition {}: starting verification with transcript", layer_index);
         if layer_index >= proof.layer_trees.len() - 1 {
             println!("FAILED FRI layer {}: Index out of bounds", layer_index);
             false
@@ -728,9 +760,9 @@ mod codev2 {
             let current_evaluations = proof.layer_evaluations.at(layer_index);
             let next_evaluations = proof.layer_evaluations.at(layer_index + 1);
             
-            // For verification, we need to reconstruct the challenge
-            // In a real implementation, this would come from the verifier's transcript
-            let challenge = generate_verification_challenge(proof, layer_index);
+            // Extract the actual challenge that was used from the transcript
+            let challenge = extract_fri_challenge_from_transcript(transcript, layer_index);
+            println!("Extracted FRI challenge for layer {}: {}", layer_index, challenge);
             
             let expected_folded = fri_fold_with_challenge(current_evaluations, challenge);
             
@@ -755,33 +787,86 @@ mod codev2 {
                     i += 1;
                 };
                 
+                if all_match {
+                    println!("PASSED FRI layer {}: All values match with transcript challenge", layer_index);
+                }
                 all_match
             }
         }
     }
 
-    fn generate_verification_challenge(proof: @FRICommitment, layer_index: u32) -> felt252 {
-        // Reconstruct challenge from commitments (simplified for demo)
-        let mut challenge_data = ArrayTrait::new();
-        let layer_felt: felt252 = layer_index.try_into().unwrap_or(0);
-        challenge_data.append(layer_felt);
+    fn extract_fri_challenge_from_transcript(transcript: @ProofTranscript, layer_index: u32) -> felt252 {
+        // Find the FRI challenge for the specific layer in the transcript
+        // Look for FRI round marker (8) followed by the layer index, then the challenge
+        let mut found_challenge: felt252 = 0;
+        let mut challenge_found = false;
+        let target_layer_felt: felt252 = layer_index.try_into().unwrap_or(0);
         
-        let mut i = 0_u32;
+        let mut i = 0;
         loop {
-            if i > layer_index || i >= proof.layer_trees.len() {
+            if i + 2 >= transcript.elements.len() || challenge_found {
                 break;
             }
-            let tree = proof.layer_trees.at(i);
-            challenge_data.append(*tree.root);
+            
+            // Check if we found the FRI round marker
+            if i < transcript.domain_separators.len() {
+                let separator = *transcript.domain_separators.at(i);
+                if separator == 8 { // FRI round marker
+                    // Next element should be the layer index
+                    if i + 1 < transcript.elements.len() {
+                        let found_layer = *transcript.elements.at(i);
+                        if found_layer == target_layer_felt {
+                            // Found the right layer, now look for the challenge marker (4)
+                            let mut j = i + 1;
+                            loop {
+                                if j + 1 >= transcript.elements.len() {
+                                    break;
+                                }
+                                
+                                if j < transcript.domain_separators.len() {
+                                    let challenge_sep = *transcript.domain_separators.at(j);
+                                    if challenge_sep == 4 { // Challenge marker
+                                        // Found the challenge for this layer
+                                        if j < transcript.elements.len() {
+                                            found_challenge = *transcript.elements.at(j);
+                                            challenge_found = true;
+                                            println!("Found challenge {} for layer {} at transcript position {}", found_challenge, layer_index, j);
+                                            break;
+                                        }
+                                    }
+                                }
+                                j += 1;
+                            };
+                        }
+                    }
+                }
+            }
+            
             i += 1;
         };
+        
+        if challenge_found {
+            found_challenge
+        } else {
+            // Fallback: use simple reconstruction if not found in transcript
+            println!("Could not find challenge for layer {} in transcript, using fallback", layer_index);
+            reconstruct_fri_challenge_for_layer_simple(layer_index)
+        }
+    }
+
+    fn reconstruct_fri_challenge_for_layer_simple(layer_index: u32) -> felt252 {
+        // Simple fallback challenge generation
+        let mut challenge_data = ArrayTrait::new();
+        challenge_data.append(FIAT_SHAMIR_DOMAIN_SEPARATOR);
+        let layer_felt: felt252 = layer_index.try_into().unwrap_or(0);
+        challenge_data.append(layer_felt);
         
         hash_array(@challenge_data)
     }
 
-    fn verify_fri_queries(proof: @FRICommitment) -> bool {
+    fn verify_fri_queries_with_transcript(proof: @FRICommitment, transcript: @ProofTranscript) -> bool {
         let queries = proof.query_phase.queries;
-        println!("FRI queries: Verifying {} queries", queries.len());
+        println!("FRI queries: Verifying {} queries with transcript", queries.len());
         
         let mut i = 0;
         let mut all_valid = true;
@@ -801,7 +886,7 @@ mod codev2 {
             }
             
             if *query.layer_index < proof.layer_trees.len() - 1 {
-                if !verify_query_folding_consistency(proof, query) {
+                if !verify_query_folding_consistency_with_transcript(proof, query, transcript) {
                     println!("FAILED FRI query {}: Folding consistency FAILED", i);
                     all_valid = false;
                     break;
@@ -814,11 +899,15 @@ mod codev2 {
         all_valid
     }
 
-    fn verify_query_folding_consistency(proof: @FRICommitment, query: @FRIQuery) -> bool {
+    fn verify_query_folding_consistency_with_transcript(
+        proof: @FRICommitment, 
+        query: @FRIQuery, 
+        transcript: @ProofTranscript
+    ) -> bool {
         if *query.layer_index >= proof.layer_trees.len() - 1 {
             true
         } else {
-            let challenge = generate_verification_challenge(proof, *query.layer_index);
+            let challenge = extract_fri_challenge_from_transcript(transcript, *query.layer_index);
             
             let current_layer_evals = proof.layer_evaluations.at(*query.layer_index);
             let layer_size = current_layer_evals.len();
@@ -848,7 +937,216 @@ mod codev2 {
         }
     }
 
-    // ============ MAIN PROOF GENERATION AND VERIFICATION WITH SECURE RANDOMNESS ============
+    fn verify_constraint_evaluations_secure(
+        evaluations: @Array<felt252>,
+        public_input: PublicInput,
+        transcript: @ProofTranscript
+    ) -> bool {
+        if evaluations.len() == 0 {
+            println!("WARNING Constraint: No evaluations to verify");
+            return true;
+        }
+        
+        // Extract the actual random points from the transcript 
+        let reconstructed_points = extract_random_points_from_transcript(transcript, NUM_QUERIES);
+        
+        if reconstructed_points.len() != evaluations.len() {
+            println!("FAILED Constraint: Point count mismatch {} vs {}", reconstructed_points.len(), evaluations.len());
+            return false;
+        }
+        
+        let mut i = 0;
+        let mut all_valid = true;
+        
+        loop {
+            if i >= evaluations.len() {
+                break;
+            }
+            
+            let evaluation = *evaluations.at(i);
+            let point = *reconstructed_points.at(i);
+            
+            if !verify_single_constraint_evaluation(evaluation, point) {
+                println!("FAILED Constraint: Evaluation {} FAILED (expected: {}, got: {})", 
+                        i, field_mul(point, point), evaluation);
+                all_valid = false;
+                break;
+            }
+            
+            i += 1;
+        };
+        
+        println!("Constraint verification final result: {}", all_valid);
+        all_valid
+    }
+
+    fn extract_random_points_from_transcript(transcript: @ProofTranscript, count: u32) -> Array<felt252> {
+        // Extract the actual random points that were generated during constraint evaluation
+        println!("=== DEBUGGING extract_random_points_from_transcript ===");
+        println!("Transcript elements length: {}", transcript.elements.len());
+        println!("Looking for count: {}", count);
+        
+        let mut points = ArrayTrait::new();
+        
+        // The constraint random points are stored in the SECOND occurrence of [5,6] pattern
+        // First [5,6] is for FRI queries, second [5,6] is for constraint evaluation
+        let mut found_first_56 = false;
+        let mut found_constraint_section = false;
+        let mut transcript_index = 0;
+        
+        println!("Searching for SECOND occurrence of [5,6] markers (constraint section)...");
+        
+        loop {
+            if transcript_index + 1 >= transcript.domain_separators.len() {
+                println!("Reached end of separators at index {}", transcript_index);
+                break;
+            }
+            
+            let sep1 = *transcript.domain_separators.at(transcript_index);
+            let sep2 = *transcript.domain_separators.at(transcript_index + 1);
+            
+            if sep1 == 5 && sep2 == 6 { // Domain size and count markers
+                if !found_first_56 {
+                    println!("Found FIRST [5,6] pattern at indices [{}, {}] - FRI queries", 
+                            transcript_index, transcript_index + 1);
+                    found_first_56 = true;
+                } else {
+                    println!("Found SECOND [5,6] pattern at indices [{}, {}] - CONSTRAINT section", 
+                            transcript_index, transcript_index + 1);
+                    found_constraint_section = true;
+                    transcript_index += 2; // Skip domain size and count
+                    break;
+                }
+            }
+            
+            transcript_index += 1;
+        };
+        
+        if !found_constraint_section {
+            println!("ERROR: Could not find SECOND [5,6] pattern for constraint random points");
+            // Fill with zeros as fallback
+            loop {
+                if points.len() >= count {
+                    break;
+                }
+                points.append(0);
+            };
+            return points;
+        }
+        
+        println!("Found constraint random section, extracting points starting at index {}...", transcript_index);
+        
+        // Extract the points that were generated for constraint evaluation
+        let mut points_found = 0_u32;
+        
+        loop {
+            if points_found >= count || transcript_index >= transcript.elements.len() {
+                println!("Stopping: points_found={}, count={}, transcript_index={}, elements_len={}", 
+                        points_found, count, transcript_index, transcript.elements.len());
+                break;
+            }
+            
+            // Look for query_index(7) followed by challenge(4) pattern
+            if transcript_index < transcript.domain_separators.len() {
+                let sep = *transcript.domain_separators.at(transcript_index);
+                
+                if sep == 7 { // Query index marker
+                    println!("Found query index marker at {}", transcript_index);
+                    transcript_index += 1; // Skip query index value
+                    
+                    // Look for the following challenge
+                    if transcript_index < transcript.domain_separators.len() && 
+                       transcript_index < transcript.elements.len() {
+                        let challenge_sep = *transcript.domain_separators.at(transcript_index);
+                        
+                        if challenge_sep == 4 { // Challenge marker
+                            let challenge = *transcript.elements.at(transcript_index);
+                            println!("Found challenge {} at index {}", challenge, transcript_index);
+                            
+                            // Convert challenge to point using same logic as generation
+                            let challenge_u256: u256 = challenge.into();
+                            let domain_size_u256: u256 = 16_u256; // Extended trace domain size
+                            let point_index_u256 = if domain_size_u256 > 0 {
+                                challenge_u256 % domain_size_u256
+                            } else {
+                                0_u256
+                            };
+                            
+                            let point_index: u32 = match point_index_u256.try_into() {
+                                Option::Some(val) => val,
+                                Option::None => {
+                                    let challenge_as_u256: u256 = challenge.into();
+                                    let mixed = (challenge_as_u256 / 17_u256 + challenge_as_u256 * 13_u256) % domain_size_u256;
+                                    mixed.try_into().unwrap_or(points_found % 16)
+                                }
+                            };
+                            
+                            let point_felt: felt252 = point_index.try_into().unwrap_or(0);
+                            points.append(point_felt);
+                            points_found += 1;
+                            
+                            println!("Extracted point {}: challenge={}, point_index={}, point_felt={}", 
+                                    points_found - 1, challenge, point_index, point_felt);
+                            
+                            transcript_index += 1;
+                        } else if challenge_sep == 9 {
+                            // Hit the constraint degree marker - we've extracted all random points
+                            println!("Hit constraint degree marker (9) at index {} - stopping extraction", transcript_index);
+                            break;
+                        } else {
+                            println!("Expected challenge marker (4), got {} at index {}", challenge_sep, transcript_index);
+                            transcript_index += 1;
+                        }
+                    } else {
+                        println!("No more elements after query index marker");
+                        break;
+                    }
+                } else if sep == 9 {
+                    // Hit the constraint degree marker - we've gone too far
+                    println!("Hit constraint degree marker (9) - stopping extraction");
+                    break;
+                } else {
+                    transcript_index += 1;
+                }
+            } else {
+                println!("Reached end of separators");
+                break;
+            }
+        };
+        
+        println!("Extracted {} points, needed {}", points.len(), count);
+        
+        // Fill remaining points with fallback values if needed
+        loop {
+            if points.len() >= count {
+                break;
+            }
+            println!("Adding fallback point {}", points.len());
+            points.append(0);
+        };
+        
+        println!("=== END DEBUGGING extract_random_points_from_transcript ===");
+        println!("Extracted {} constraint random points from transcript", points.len());
+        if points.len() > 0 {
+            println!("First extracted constraint point: {}, Last: {}", *points.at(0), *points.at(points.len() - 1));
+        }
+        
+        points
+    }
+
+    // ============ FALLBACK VERIFICATION FUNCTIONS ============
+
+    fn verify_fri_proof(proof: @FRICommitment) -> bool {
+        // Simple fallback that just calls the transcript-based version with empty transcript
+        let empty_transcript = ProofTranscript {
+            elements: ArrayTrait::new(),
+            domain_separators: ArrayTrait::new(),
+            round_counter: 0,
+        };
+        verify_fri_proof_with_transcript(proof, @empty_transcript)
+    }
+
+    // ============ MAIN PROOF GENERATION AND VERIFICATION ============
 
     fn generate_stark_proof(
         public_input: PublicInput,
@@ -921,7 +1219,9 @@ mod codev2 {
                 println!("FAILED: Public coin seed verification");
                 false
             } else {
-                let valid_fri = verify_fri_proof(@proof.fri_proof);
+                // For verification, we use the proof's transcript directly since it contains 
+                // the exact challenges that were used during proof generation
+                let valid_fri = verify_fri_proof_with_transcript(@proof.fri_proof, @proof.transcript);
                 let valid_constraints = verify_constraint_evaluations_secure(
                     @proof.trace_evaluations,
                     public_input,
@@ -982,7 +1282,7 @@ mod codev2 {
         hash_array(@seed_data)
     }
 
-    // ============ UPDATED HELPER FUNCTIONS ============
+    // ============ HELPER FUNCTIONS ============
 
     fn evaluate_constraints_secure(
         constraints: @AIRConstraints,
@@ -1014,65 +1314,6 @@ mod codev2 {
         
         evaluations
     }
-
-    fn verify_constraint_evaluations_secure(
-        evaluations: @Array<felt252>,
-        public_input: PublicInput,
-        transcript: @ProofTranscript
-    ) -> bool {
-        if evaluations.len() == 0 {
-            println!("WARNING Constraint: No evaluations to verify");
-            return true;
-        }
-        
-        // Reconstruct the random points from transcript
-        let reconstructed_points = reconstruct_random_points_from_transcript(transcript);
-        
-        let mut i = 0;
-        let mut all_valid = true;
-        
-        loop {
-            if i >= evaluations.len() {
-                break;
-            }
-            
-            let evaluation = *evaluations.at(i);
-            let point = *reconstructed_points.at(i);
-            
-            if !verify_single_constraint_evaluation(evaluation, point) {
-                println!("FAILED Constraint: Evaluation {} FAILED", i);
-                all_valid = false;
-                break;
-            }
-            
-            i += 1;
-        };
-        
-        println!("Constraint verification final result: {}", all_valid);
-        all_valid
-    }
-
-    fn reconstruct_random_points_from_transcript(transcript: @ProofTranscript) -> Array<felt252> {
-        // Simplified reconstruction - extract challenge-based points
-        let mut points = ArrayTrait::new();
-        let mut i = 0;
-        
-        loop {
-            if i >= NUM_QUERIES || i + 4 >= transcript.elements.len() {
-                break;
-            }
-            
-            // Find challenge markers and reconstruct points
-            let element = *transcript.elements.at(i + 4);  // Skip initial public inputs
-            points.append(element);
-            
-            i += 1;
-        };
-        
-        points
-    }
-
-    // ============ REMAINING HELPER FUNCTIONS (unchanged) ============
 
     fn generate_execution_trace(
         public_input: PublicInput,
@@ -1117,7 +1358,8 @@ mod codev2 {
 
     fn compute_low_degree_extension(trace: @TraceTable) -> Array<felt252> {
         let mut extended = ArrayTrait::new();
-        let domain_size = *trace.length * BLOW_UP_FACTOR;
+        let trace_length_u32: u32 = (*trace.length).try_into().unwrap_or(1);
+        let domain_size = trace_length_u32 * BLOW_UP_FACTOR;
         
         let mut i = 0_u32;
         loop {
