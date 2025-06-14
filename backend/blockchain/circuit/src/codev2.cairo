@@ -204,7 +204,8 @@ mod codev2 {
             
             // Map challenge to domain [0, domain_size)
             let point_index = (challenge.try_into().unwrap_or(0_u32)) % domain_size;
-            points.append(point_index.into());
+            let point_felt: felt252 = point_index.try_into().unwrap_or(0);
+            points.append(point_felt);
             
             i += 1;
         };
@@ -509,8 +510,9 @@ mod codev2 {
             let folded_evaluations = fri_fold_with_challenge(@current_evaluations, challenge);
             
             // Create domain for folded polynomial
+            let folded_len_u32: u32 = folded_evaluations.len().try_into().unwrap_or(1);
             let folded_domain = create_evaluation_domain(
-                folded_evaluations.len(), 
+                folded_len_u32, 
                 field_mul(*domains.at(round).offset, challenge)
             );
             domains.append(folded_domain);
@@ -576,8 +578,8 @@ mod codev2 {
         
         // Generate secure random query positions
         let first_tree = trees.at(0);
-        let domain_size = first_tree.nodes.at(0).len();
-        let domain_size_u32: u32 = domain_size.try_into().unwrap_or(1);
+        let domain_size_usize = first_tree.nodes.at(0).len();
+        let domain_size_u32: u32 = domain_size_usize.try_into().unwrap_or(1);
         
         let query_positions = generate_secure_random_points(
             ref transcript, 
@@ -622,14 +624,16 @@ mod codev2 {
                 let half_size = layer_size / 2;
                 
                 // Correct FRI sibling pairing
-                let sibling_pos = if current_position < half_size {
-                    current_position + half_size
+                let half_size_u32: u32 = half_size.try_into().unwrap_or(1);
+                let sibling_pos = if current_position < half_size_u32 {
+                    current_position + half_size_u32
                 } else {
-                    current_position - half_size
+                    current_position - half_size_u32
                 };
                 
-                let sibling_value = if sibling_pos < layer_size {
-                    *layer_evals.at(sibling_pos)
+                let sibling_pos_usize: usize = sibling_pos.try_into().unwrap_or(0);
+                let sibling_value = if sibling_pos_usize < layer_size {
+                    *layer_evals.at(sibling_pos_usize)
                 } else {
                     value
                 };
@@ -818,20 +822,22 @@ mod codev2 {
             
             let current_layer_evals = proof.layer_evaluations.at(*query.layer_index);
             let layer_size = current_layer_evals.len();
-            let half_size = layer_size / 2;
+            let half_size_usize = layer_size / 2;
+            let half_size_u32: u32 = half_size_usize.try_into().unwrap_or(1);
             
-            let expected_folded = if *query.position < half_size {
+            let expected_folded = if *query.position < half_size_u32 {
                 field_add(*query.value, field_mul(challenge, *query.sibling_value))
             } else {
                 field_add(*query.sibling_value, field_mul(challenge, *query.value))
             };
             
             let next_layer_evals = proof.layer_evaluations.at(*query.layer_index + 1);
-            let folded_position = if *query.position < half_size {
+            let folded_position_u32 = if *query.position < half_size_u32 {
                 *query.position
             } else {
-                *query.position - half_size
+                *query.position - half_size_u32
             };
+            let folded_position: usize = folded_position_u32.try_into().unwrap_or(0);
             
             if folded_position >= next_layer_evals.len() {
                 false
@@ -869,9 +875,10 @@ mod codev2 {
         println!("Generated FRI proof with {} layers", fri_proof.layer_trees.len());
         
         // Generate secure random points for constraint evaluation
+        let extended_trace_len_u32: u32 = extended_trace.len().try_into().unwrap_or(1);
         let random_points = generate_secure_random_points(
             ref transcript, 
-            extended_trace.len().try_into().unwrap_or(1), 
+            extended_trace_len_u32, 
             NUM_QUERIES
         );
         
@@ -904,63 +911,64 @@ mod codev2 {
         println!("=== STARK Proof Verification Started ===");
         
         // Verify transcript integrity
-        if !verify_transcript_integrity(@proof.transcript, public_input) {
+        let transcript_valid = verify_transcript_integrity(@proof.transcript, public_input);
+        if !transcript_valid {
             println!("FAILED: Transcript integrity verification");
-            return false;
+            false
+        } else {
+            let expected_seed = generate_public_coin_seed(public_input, @proof.trace_commitment);
+            if proof.public_coin_seed != expected_seed {
+                println!("FAILED: Public coin seed verification");
+                false
+            } else {
+                let valid_fri = verify_fri_proof(@proof.fri_proof);
+                let valid_constraints = verify_constraint_evaluations_secure(
+                    @proof.trace_evaluations,
+                    public_input,
+                    @proof.transcript
+                );
+                let valid_degree = verify_low_degree_proof(
+                    @proof.low_degree_proof,
+                    @proof.fri_proof
+                );
+                
+                let final_result = valid_fri && valid_constraints && valid_degree;
+                println!("=== Final verification result: {} ===", final_result);
+                
+                final_result
+            }
         }
-        
-        let expected_seed = generate_public_coin_seed(public_input, @proof.trace_commitment);
-        if proof.public_coin_seed != expected_seed {
-            println!("FAILED: Public coin seed verification");
-            return false;
-        }
-        
-        let valid_fri = verify_fri_proof(@proof.fri_proof);
-        let valid_constraints = verify_constraint_evaluations_secure(
-            @proof.trace_evaluations,
-            public_input,
-            @proof.transcript
-        );
-        let valid_degree = verify_low_degree_proof(
-            @proof.low_degree_proof,
-            @proof.fri_proof
-        );
-        
-        let final_result = valid_fri && valid_constraints && valid_degree;
-        println!("=== Final verification result: {} ===", final_result);
-        
-        final_result
     }
 
     fn verify_transcript_integrity(transcript: @ProofTranscript, public_input: PublicInput) -> bool {
-        if transcript.elements.len() < 4 {
+        let has_enough_elements = transcript.elements.len() >= 4;
+        if !has_enough_elements {
             println!("FAILED: Transcript too short");
-            return false;
+            false
+        } else {
+            // Verify transcript starts with correct domain separator and public inputs
+            let valid_separator = *transcript.elements.at(0) == FIAT_SHAMIR_DOMAIN_SEPARATOR;
+            let valid_message = *transcript.elements.at(1) == public_input.message_hash;
+            let valid_pubkey = *transcript.elements.at(2) == public_input.public_key;
+            let valid_signature = *transcript.elements.at(3) == public_input.signature;
+            
+            if !valid_separator {
+                println!("FAILED: Invalid domain separator");
+                false
+            } else if !valid_message {
+                println!("FAILED: Message hash mismatch in transcript");
+                false
+            } else if !valid_pubkey {
+                println!("FAILED: Public key mismatch in transcript");
+                false
+            } else if !valid_signature {
+                println!("FAILED: Signature mismatch in transcript");
+                false
+            } else {
+                println!("PASSED: Transcript integrity verification");
+                true
+            }
         }
-        
-        // Verify transcript starts with correct domain separator and public inputs
-        if *transcript.elements.at(0) != FIAT_SHAMIR_DOMAIN_SEPARATOR {
-            println!("FAILED: Invalid domain separator");
-            return false;
-        }
-        
-        if *transcript.elements.at(1) != public_input.message_hash {
-            println!("FAILED: Message hash mismatch in transcript");
-            return false;
-        }
-        
-        if *transcript.elements.at(2) != public_input.public_key {
-            println!("FAILED: Public key mismatch in transcript");
-            return false;
-        }
-        
-        if *transcript.elements.at(3) != public_input.signature {
-            println!("FAILED: Signature mismatch in transcript");
-            return false;
-        }
-        
-        println!("PASSED: Transcript integrity verification");
-        true
     }
 
     fn generate_public_coin_seed(public_input: PublicInput, commitment: @MerkleTree) -> felt252 {
@@ -985,7 +993,7 @@ mod codev2 {
         let mut evaluations = ArrayTrait::new();
         
         // Add constraint evaluation to transcript
-        let degree_felt: felt252 = constraints.constraint_degree.try_into().unwrap_or(0);
+        let degree_felt: felt252 = (*constraints.constraint_degree).try_into().unwrap_or(0);
         append_to_transcript(ref transcript, degree_felt, 9);
         
         let mut i = 0;
@@ -1018,10 +1026,6 @@ mod codev2 {
         }
         
         // Reconstruct the random points from transcript
-        let mut verifier_transcript = init_transcript(public_input);
-        
-        // The verifier needs to reconstruct the same random points
-        // This is a simplified version - in practice, you'd replay the transcript
         let reconstructed_points = reconstruct_random_points_from_transcript(transcript);
         
         let mut i = 0;
@@ -1176,40 +1180,45 @@ mod codev2 {
     ) -> bool {
         if proof.len() == 0 || fri_proof.layer_trees.len() == 0 {
             println!("FAILED Low degree: Empty proof or FRI layers");
-            return false;
-        }
-        
-        let max_degree = calculate_max_degree(proof);
-        let degree_bound_u32 = FRI_ROUNDS * BLOW_UP_FACTOR;
-        let degree_bound: felt252 = degree_bound_u32.try_into().unwrap_or(0);
-        
-        if felt252_gt(max_degree, degree_bound) {
-            println!("FAILED Low degree: Degree too high");
-            return false;
-        }
-        
-        let first_layer_evals = fri_proof.layer_evaluations.at(0);
-        if proof.len() != first_layer_evals.len() {
-            println!("FAILED Low degree: Length mismatch");
-            return false;
-        }
-        
-        let mut i = 0;
-        loop {
-            if i >= proof.len() {
-                break;
-            }
+            false
+        } else {
+            let max_degree = calculate_max_degree(proof);
+            let degree_bound_u32 = FRI_ROUNDS * BLOW_UP_FACTOR;
+            let degree_bound: felt252 = degree_bound_u32.try_into().unwrap_or(0);
             
-            if *proof.at(i) != *first_layer_evals.at(i) {
-                println!("FAILED Low degree: Element mismatch at index {}", i);
-                return false;
+            if felt252_gt(max_degree, degree_bound) {
+                println!("FAILED Low degree: Degree too high");
+                false
+            } else {
+                let first_layer_evals = fri_proof.layer_evaluations.at(0);
+                if proof.len() != first_layer_evals.len() {
+                    println!("FAILED Low degree: Length mismatch");
+                    false
+                } else {
+                    let mut i = 0;
+                    let mut all_match = true;
+                    
+                    loop {
+                        if i >= proof.len() {
+                            break;
+                        }
+                        
+                        if *proof.at(i) != *first_layer_evals.at(i) {
+                            println!("FAILED Low degree: Element mismatch at index {}", i);
+                            all_match = false;
+                            break;
+                        }
+                        
+                        i += 1;
+                    };
+                    
+                    if all_match {
+                        println!("PASSED Low degree: All checks passed");
+                    }
+                    all_match
+                }
             }
-            
-            i += 1;
-        };
-        
-        println!("PASSED Low degree: All checks passed");
-        true
+        }
     }
 
     fn calculate_max_degree(poly: @Array<felt252>) -> felt252 {
@@ -1257,7 +1266,7 @@ mod codev2 {
             println!("STARK proof verification failed!");
         }
 
-        assert(is_valid, 'Secure proof verification failed');
+        assert(is_valid, 'Secure proof failed');
     }
 
     #[event]
